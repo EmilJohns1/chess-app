@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Chess } from 'chess.js';
 import { Square } from 'chess.js';
 
@@ -22,12 +22,59 @@ const pieceImages: { [key: string]: string } = {
 const Chessboard: React.FC = () => {
   const [game, setGame] = useState(new Chess());
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [isPlayerBlack, setIsPlayerBlack] = useState<boolean>(false);
+
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8080');
+    ws.onopen = () => {
+      setSocket(ws);
+    };
+    ws.onmessage = async (event) => {
+      const message = event.data;
+      if (message === 'You are playing as black') {
+        setIsPlayerBlack(true);
+        return;
+      }
+      if (message === 'You are playing as white') {
+        setIsPlayerBlack(false);
+        return;
+      }
+      const reader = new FileReader(); // FileReader object to read Blob as text
+      reader.onload = async () => {
+        const message = reader.result as string; // Read the Blob as text and assert it as string
+        try {
+          const move = JSON.parse(message);
+          if (move && move.from && move.to) {
+            const chessMove = { from: move.from, to: move.to };
+            const result = game.move(chessMove);
+            if (result) {
+              setGame(new Chess(game.fen()));
+            }
+          }
+        } catch (error) {
+          console.error('Received non-JSON message:', message);
+        }
+      };
+      reader.readAsText(event.data); // Read the Blob as text
+    };
+    
+    return () => {
+      ws.close();
+    };
+  }, [game]);
 
   const handleSquareClick = (x: number, y: number) => {
     const file = String.fromCharCode('a'.charCodeAt(0) + x);
     const rank = (8 - y).toString();
     const square: Square = file + rank as Square;
     const turn = game.turn();
+    console.log(isPlayerBlack, turn, square, selectedSquare)
+    if (isPlayerBlack && turn === 'w') {
+      return;
+    } else if (!isPlayerBlack && turn === 'b') {
+      return;
+    }
 
     if (selectedSquare) {
       if (selectedSquare === square) {
@@ -52,18 +99,21 @@ const Chessboard: React.FC = () => {
 
   const handleMove = (from: string, to: string) => {
     const move = game.move({ from, to });
-    if (move) {
-      setGame(new Chess(game.fen())); // Update the game state
+    if (move && socket) {
+      socket.send(JSON.stringify({ from, to }));
+      setGame(new Chess(game.fen()));
     }
   };
 
   const renderSquare = (piece: any, x: number, y: number) => {
-    const isSelected = selectedSquare === `${String.fromCharCode('a'.charCodeAt(0) + x)}${8 - y}`;
+    const highlightedY = isPlayerBlack ? y + 1 : 8 - y;
+    const isSelected = selectedSquare === `${String.fromCharCode('a'.charCodeAt(0) + x)}${highlightedY}`;
+    const adjustedY = isPlayerBlack ? 7 - y : y;
     return (
       <div
-        key={`${x}-${8 - y}`}
-        onClick={() => handleSquareClick(x, y)}
-        className={`w-20 h-20 flex items-center justify-center justify-items-center ${x % 2 === y % 2 ? 'bg-gray-300' : 'bg-white'} ${isSelected ? 'border-4 border-blue-500' : ''}`}
+        key={`${x}-${adjustedY}`}
+        onClick={() => handleSquareClick(x, adjustedY)}
+        className={`w-20 h-20 flex items-center justify-center justify-items-center ${x % 2 === adjustedY % 2 ? 'bg-gray-300' : 'bg-white'} ${isSelected ? 'border-4 border-blue-500' : ''}`}
       >
         {piece && <img src={`/pieces/${pieceImages[(piece.color) + piece.type]}`} alt={piece.type} className="w-16 h-16" />}
       </div>
@@ -74,9 +124,15 @@ const Chessboard: React.FC = () => {
     const boardSetup = game.board();
     return (
       <div className="grid grid-cols-8 gap-0">
-        {boardSetup.slice().map((row, y) => (
-          row.map((square, x) => renderSquare(square ? square : '', x, y))
-        ))}
+        {isPlayerBlack ? 
+          boardSetup.slice().reverse().map((row, y) => (
+            row.map((square, x) => renderSquare(square ? square : '', x, y))
+          ))
+        :
+          boardSetup.slice().map((row, y) => (
+            row.map((square, x) => renderSquare(square ? square : '', x, y))
+          ))
+        }
       </div>
     );
   };
