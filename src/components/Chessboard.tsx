@@ -24,6 +24,7 @@ const Chessboard: React.FC = () => {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [isPlayerBlack, setIsPlayerBlack] = useState<boolean>(false);
+  const [gameOverMessage, setGameOverMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:8080');
@@ -40,9 +41,9 @@ const Chessboard: React.FC = () => {
         setIsPlayerBlack(false);
         return;
       }
-      const reader = new FileReader(); // FileReader object to read Blob as text
+      const reader = new FileReader();
       reader.onload = async () => {
-        const message = reader.result as string; // Read the Blob as text and assert it as string
+        const message = reader.result as string;
         try {
           const move = JSON.parse(message);
           if (move && move.from && move.to) {
@@ -50,13 +51,14 @@ const Chessboard: React.FC = () => {
             const result = game.move(chessMove);
             if (result) {
               setGame(new Chess(game.fen()));
+              checkGameOver();
             }
           }
         } catch (error) {
           console.error('Received non-JSON message:', message);
         }
       };
-      reader.readAsText(event.data); // Read the Blob as text
+      reader.readAsText(event.data);
     };
     
     return () => {
@@ -102,7 +104,22 @@ const Chessboard: React.FC = () => {
     if (move && socket) {
       socket.send(JSON.stringify({ from, to }));
       setGame(new Chess(game.fen()));
+      checkGameOver();
     }
+  };
+
+  const checkGameOver = () => {
+    if (game.isCheckmate()) {
+      setGameOverMessage('Checkmate! Game Over.');
+    } else if (game.isDraw()) {
+      setGameOverMessage('Draw! Game Over.');
+    } else if (game.isStalemate()) {
+      setGameOverMessage('Stalemate! Game Over.');
+    } else if (game.isThreefoldRepetition()) {
+      setGameOverMessage('Threefold Repetition! Game Over.');
+    } else if (game.isInsufficientMaterial()) {
+      setGameOverMessage('Insufficient Material! Game Over.');
+    } 
   };
 
   const renderSquare = (piece: any, x: number, y: number) => {
@@ -140,6 +157,19 @@ const Chessboard: React.FC = () => {
   return (
     <div className="flex items-center justify-center">
       {renderBoard()}
+      {gameOverMessage && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+          <div className="bg-white p-8 rounded-lg shadow-lg">
+            <h2 className="text-xl font-bold">{gameOverMessage}</h2>
+            <button 
+              onClick={() => setGameOverMessage(null)} 
+              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
