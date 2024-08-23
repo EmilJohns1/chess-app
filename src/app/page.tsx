@@ -13,7 +13,7 @@ const Home: React.FC = () => {
 
       <main className="text-center">
         <h1 className="text-4xl font-bold mb-12">Chess App</h1>
-        <div className="flex justify-center">
+        <div className="flex justify-center bg-gray-400">
           <Chessboard />
         </div>
       </main>
