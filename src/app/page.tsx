@@ -1,6 +1,5 @@
-// pages/index.tsx
 import Head from 'next/head';
-import Chessboard from '../components/Chessboard';
+import Link from 'next/link';
 
 const Home: React.FC = () => {
   return (
@@ -13,8 +12,10 @@ const Home: React.FC = () => {
 
       <main className="text-center">
         <h1 className="text-4xl font-bold mb-12">Chess App</h1>
-        <div className="flex justify-center bg-gray-400">
-          <Chessboard />
+        <div className="flex justify-center bg-gray-400 p-4">
+          <Link href="/play" className="px-6 py-3 bg-blue-500 text-white rounded hover:bg-blue-600">
+            Play
+          </Link>
         </div>
       </main>
     </div>
